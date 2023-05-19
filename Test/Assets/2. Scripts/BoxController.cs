@@ -4,17 +4,22 @@ using UnityEngine;
 
 public class BoxController : MonoBehaviour
 {
-    private Vector3 mousePosition;
-    private Rigidbody rigid;
+    private Vector3 initMousePosition;
+    private Vector3 initialObjectPosition;
     private Quaternion initRotation;
 
-    private float rotateSpeed = 180f;
-    private float moveSpeed = 0.5f;
+    private Rigidbody rigid;
 
-    private bool isRotate;
+    private float moveSpeed = 25f;
 
-    public SpherePool objectPool;
-    private int poolSize = 10;
+    private bool isRotate = false;
+    private bool isDragging = false;
+
+    private float minX = -16f;
+    private float maxX = 16f;
+
+    public SpherePool spherePool;
+    private int poolSize = 20;
 
     private void Start()
     {
@@ -23,32 +28,33 @@ public class BoxController : MonoBehaviour
         rigid.useGravity = false;
         rigid.isKinematic = true;
 
-        objectPool.Initialize(poolSize);
+        spherePool.Initialize(poolSize);
     }
 
     private void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0) && !isDragging && !isRotate)
         {
-            mousePosition = Input.mousePosition;
-            isRotate = true;
-            initRotation = transform.rotation;
-        }
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
 
-        if (Input.GetMouseButton(0))
-        {
-            float deltaX = Input.mousePosition.x - mousePosition.x;
-
-            transform.Translate(Vector3.right * deltaX * moveSpeed * Time.deltaTime);
-        }
-
-        if (Input.GetMouseButtonUp(0))
-        {
-            if (isRotate)
+            if (Physics.Raycast(ray, out hit))
             {
-                // 오브젝트를 180도 회전하는 애니메이션 시작
-                StartCoroutine(RotateObject());
+                if (hit.collider.gameObject == gameObject)
+                {
+                    isDragging = true;
+                    initMousePosition = Input.mousePosition;
+                    initialObjectPosition = transform.position;
+                    initRotation = transform.rotation; // 회전을 시작하기 전에 초기 회전값 설정
+                }
             }
+        }
+
+        if (Input.GetMouseButtonUp(0) && isDragging && !isRotate)
+        {
+            isDragging = false;
+            isRotate = true;
+            StartCoroutine(RotateObject());
         }
     }
 
@@ -64,51 +70,37 @@ public class BoxController : MonoBehaviour
                 break;
             }
         }
+
+        if (isDragging)
+        {
+            Vector3 mouseDelta = Input.mousePosition - initMousePosition;
+            float deltaX = mouseDelta.x / Screen.width;                     // 마우스 이동거리를 화면 비율로 변환
+
+            float targetX = initialObjectPosition.x + deltaX * moveSpeed;
+            targetX = Mathf.Clamp(targetX, minX, maxX);                     // X축 이동 제한 적용
+
+            Vector3 newPosition = new Vector3(targetX, transform.position.y, transform.position.z);
+            transform.position = newPosition;
+        }
     }
 
     IEnumerator RotateObject()
     {
-        isRotate = false;
         float elapsedTime = 0f;
-        Quaternion targetRotation = initRotation * Quaternion.Euler(0f, 0f, rotateSpeed); // 180도 회전
+        float rotationTime = 1f; // 회전에 걸리는 시간
 
-        while (elapsedTime < 1f)
+        Quaternion targetRotation = initRotation * Quaternion.Euler(0f, 0f, 180f); // 180도 회전
+
+        while (elapsedTime < rotationTime)
         {
             elapsedTime += Time.deltaTime;
-            transform.rotation = Quaternion.Slerp(initRotation, targetRotation, elapsedTime);
+            float t = Mathf.Clamp01(elapsedTime / rotationTime);
+            Quaternion currentRotation = Quaternion.Lerp(initRotation, targetRotation, t);
+
+            transform.rotation = currentRotation;
             yield return null;
         }
 
-        // Sphere 풀에서 재사용할 Sphere 가져오기
-        for (int i = 0; i < poolSize; ++i)
-        {
-            GameObject sphere = objectPool.GetObject();
-
-            // Sphere 초기화 및 위치 설정
-            Vector3 spherePosition = transform.position + Vector3.up * i;
-            spherePosition.y = GetSpherePosition(spherePosition, sphere.GetComponent<SphereCollider>().radius);
-            
-            sphere.transform.position = spherePosition;
-            sphere.GetComponent<BallController>().StartFalling();
-        }
-
-        // Sphere 생성 후 오브젝트 초기 위치로 이동
-        // transform.position = new Vector3(0f, 9f, 0f);
-        // transform.rotation = Quaternion.identity;
-    }
-
-    float GetSpherePosition(Vector3 desiredPosition, float radius)
-    {
-        Collider[] colliders = Physics.OverlapSphere(desiredPosition, radius);
-
-        foreach(Collider collider in colliders)
-        {
-            if(collider.CompareTag("Ball"))
-            {
-                desiredPosition.y += radius * 1.5f;
-            }
-        }
-
-        return desiredPosition.y;
+        isRotate = false;
     }
 }
