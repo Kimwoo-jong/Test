@@ -1,31 +1,71 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class CheckCollision : MonoBehaviour
 {
     private List<GameObject> reachedObjects = new List<GameObject>();
-   
+
     private int reachedSphereCount = 0;
     private bool isDetectionEnabled = true;
 
-    private void OnCollisionEnter(Collision other)
+    private MeshRenderer mesh;
+    public Material[] materials;
+
+    private void Start()
     {
-        if (!isDetectionEnabled || reachedObjects.Contains(other.gameObject) || !other.gameObject.CompareTag("Ball"))
+        mesh = GetComponent<MeshRenderer>();
+    }
+
+    public void ChangeMaterial()
+    {
+        if (mesh != null && reachedSphereCount == 5)
+        {
+            mesh.material = materials[0];
+        }
+
+        if (mesh != null && reachedSphereCount == 10)
+        {
+            mesh.material = materials[1];
+        }
+
+        if (mesh != null && reachedSphereCount >= 15)
+        {
+            mesh.material = materials[2];
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!isDetectionEnabled || !other.gameObject.CompareTag("Ball"))
+        {
             return;
+        }
+
+        BallController ballController = other.gameObject.GetComponent<BallController>();
+        if (ballController != null && ballController.isTriggered)
+        {
+            return;
+        }
 
         reachedObjects.Add(other.gameObject);
         reachedSphereCount++;
+
+        ChangeMaterial();
+        //Debug.Log("Name: " + other.gameObject.name);
         Debug.Log("Ball Count : " + reachedSphereCount);
 
         if (reachedSphereCount >= 20)
         {
             RemoveReachedObjects();
         }
+        else
+        {
+            ballController?.TriggerBall();
+        }
     }
 
-    private void OnCollisionExit(Collision other)
+    private void OnTriggerExit(Collider other)
     {
         if (reachedObjects.Contains(other.gameObject) && other.gameObject.CompareTag("Ball"))
         {
@@ -37,14 +77,16 @@ public class CheckCollision : MonoBehaviour
     {
         foreach (GameObject obj in reachedObjects)
         {
-            if (obj.CompareTag("Ball"))
+            BallController ballController = obj.GetComponent<BallController>();
+            if (ballController != null && ballController.isTriggered)
             {
-                Destroy(this.gameObject);
+                ballController.ResetTrigger();
             }
         }
 
         reachedObjects.Clear();
         reachedSphereCount = 0;
         isDetectionEnabled = true;
+        Destroy(gameObject);
     }
 }

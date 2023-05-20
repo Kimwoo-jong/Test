@@ -18,22 +18,17 @@ public class BoxController : MonoBehaviour
     private float minX = -16f;
     private float maxX = 16f;
 
-    public SpherePool spherePool;
-    private int poolSize = 20;
-
     private void Start()
     {
         rigid = GetComponent<Rigidbody>();
 
         rigid.useGravity = false;
         rigid.isKinematic = true;
-
-        spherePool.Initialize(poolSize);
     }
 
     private void Update()
     {
-        if (Input.GetMouseButtonDown(0) && !isDragging && !isRotate)
+        if (Input.GetMouseButtonDown(0) && !isRotate)
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             RaycastHit hit;
